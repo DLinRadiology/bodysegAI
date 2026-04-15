@@ -1,0 +1,4 @@
+1. Place .nii or .nii.gz files in input folder. 
+2. Run "run.py" with Python
+
+Assumes niftis created with dcm2nii. Otherwise the rotation is incorrect and the model will fail. Edit first line in run.py to not show the orientation.

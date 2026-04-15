@@ -1,0 +1,9 @@
+onnxruntime
+numpy
+nibabel
+SimpleITK
+scikit-image
+Pillow
+flask
+reportlab
+pydicom

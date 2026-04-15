@@ -1,0 +1,17 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+uploads/
+temp_output/
+input/
+output/
+xRobotstuffx/saved_model/
+xRobotstuffx/nii_img.png
+xRobotstuffx/test data/
+xRobotstuffx/notebook robot.ipynb
+xRobotstuffx/weights
+xRobotstuffx/weights.h5
+dist/
+build/
+*.egg-info/

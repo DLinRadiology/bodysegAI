@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BodySegAI — Body Composition Analysis</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <div class="logo-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z"/>
+                    <path d="M8 14s-3 2-3 5a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3c0-3-3-5-3-5"/>
+                </svg>
+            </div>
+            <span class="brand-text">BodySegAI</span>
+            <span class="brand-sub">CT Body Composition</span>
+        </div>
+        <div class="nav-status" id="navStatus"></div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+
+        <!-- STEP 1: Upload -->
+        <section id="stepUpload" class="step active">
+            <div class="upload-zone" id="dropZone">
+                <div class="upload-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <h2>Drop CT files here</h2>
+                <p>DICOM (.dcm) or NIfTI (.nii, .nii.gz) — single or multiple slices</p>
+                <div class="upload-actions">
+                    <label class="btn btn-primary" for="fileInput">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Select Files
+                    </label>
+                    <label class="btn btn-outline" for="folderInput">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Select Folder
+                    </label>
+                </div>
+                <input type="file" id="fileInput" multiple accept=".dcm,.nii,.nii.gz,.gz" hidden>
+                <input type="file" id="folderInput" webkitdirectory hidden>
+            </div>
+        </section>
+
+        <!-- STEP 2: Preview & Patient Info (Single Slice) -->
+        <section id="stepPreview" class="step">
+            <div class="preview-layout">
+                <div class="preview-card">
+                    <h3>CT Preview</h3>
+                    <div class="image-frame">
+                        <img id="previewImage" alt="CT Preview">
+                    </div>
+                    <div class="image-meta" id="imageMeta"></div>
+                </div>
+                <div class="info-card" id="patientInfoCard">
+                    <h3>Patient Information</h3>
+                    <div class="form-group">
+                        <label for="patientName">Patient Name</label>
+                        <input type="text" id="patientName" placeholder="Enter patient name">
+                    </div>
+                    <div class="form-group">
+                        <label for="patientSex">Gender</label>
+                        <select id="patientSex">
+                            <option value="">— Select —</option>
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Exam Date</label>
+                        <input type="text" id="studyDate" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Slice Thickness</label>
+                        <input type="text" id="sliceThickness" readonly>
+                    </div>
+                    <button class="btn btn-primary btn-large" id="btnSegment">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        Run Segmentation
+                    </button>
+                    <button class="btn btn-outline btn-back" id="btnBack">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"/>
+                            <polyline points="12 19 5 12 12 5"/>
+                        </svg>
+                        Start Over
+                    </button>
+                </div>
+            </div>
+            <!-- Multi-slice info bar -->
+            <div class="multi-info-bar" id="multiInfoBar" style="display:none;">
+                <div class="multi-info-text">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                    </svg>
+                    <span id="multiSliceCount"></span> slices detected — batch mode
+                </div>
+                <button class="btn btn-primary" id="btnSegmentMulti">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    Segment All Slices
+                </button>
+                <button class="btn btn-outline btn-back" id="btnBackMulti">Start Over</button>
+            </div>
+        </section>
+
+        <!-- Loading overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+            <div class="loading-card">
+                <div class="spinner"></div>
+                <h3 id="loadingText">Running segmentation...</h3>
+                <p class="loading-sub">This may take a moment</p>
+            </div>
+        </div>
+
+        <!-- STEP 3a: Results Single Slice -->
+        <section id="stepResultsSingle" class="step">
+            <div class="results-header">
+                <h2>Segmentation Results</h2>
+                <div class="results-patient" id="resultsPatientInfo"></div>
+            </div>
+
+            <!-- Side by side raw + overlay -->
+            <div class="comparison-view">
+                <div class="comparison-panel">
+                    <h4>Original CT</h4>
+                    <div class="image-frame large">
+                        <img id="resultRaw" alt="Raw CT">
+                    </div>
+                </div>
+                <div class="comparison-panel">
+                    <h4>Segmentation Overlay</h4>
+                    <div class="image-frame large">
+                        <img id="resultOverlay" alt="Segmentation">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Legend -->
+            <div class="legend-bar">
+                <div class="legend-item"><span class="legend-color" style="background:#EF4444"></span>Skeletal Muscle</div>
+                <div class="legend-item"><span class="legend-color" style="background:#F59E0B"></span>IMAT</div>
+                <div class="legend-item"><span class="legend-color" style="background:#3B82F6"></span>SAT</div>
+                <div class="legend-item"><span class="legend-color" style="background:#10B981"></span>VAT</div>
+            </div>
+
+            <!-- Tissue detail cards -->
+            <div class="tissue-grid" id="tissueGrid"></div>
+
+            <!-- Reference values -->
+            <div class="reference-section" id="referenceSection" style="display:none;">
+                <h3>Reference Values</h3>
+                <div id="referenceContent"></div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="action-bar">
+                <button class="btn btn-primary" id="btnDownloadPdf">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    Download PDF Report
+                </button>
+                <button class="btn btn-secondary" id="btnDownloadCsv">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download CSV
+                </button>
+                <button class="btn btn-secondary" id="btnDownloadMask">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    Download Mask (.nii.gz)
+                </button>
+                <label class="btn btn-outline" for="correctedMaskInput">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Load Corrected Mask
+                </label>
+                <input type="file" id="correctedMaskInput" accept=".nii,.nii.gz,.gz" hidden>
+                <button class="btn btn-outline btn-back" id="btnNewAnalysis">Start Over</button>
+            </div>
+        </section>
+
+        <!-- STEP 3b: Results Multi Slice -->
+        <section id="stepResultsMulti" class="step">
+            <div class="results-header">
+                <h2>Batch Segmentation Complete</h2>
+                <p class="results-summary" id="multiResultsSummary"></p>
+            </div>
+
+            <!-- Summary table -->
+            <div class="table-container">
+                <table class="results-table" id="multiResultsTable">
+                    <thead>
+                        <tr>
+                            <th>Slice</th>
+                            <th>SM (cm²)</th>
+                            <th>IMAT (cm²)</th>
+                            <th>SAT (cm²)</th>
+                            <th>VAT (cm²)</th>
+                            <th>SM HU</th>
+                            <th>IMAT HU</th>
+                            <th>SAT HU</th>
+                            <th>VAT HU</th>
+                        </tr>
+                    </thead>
+                    <tbody id="multiResultsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="action-bar">
+                <button class="btn btn-primary" id="btnDownloadCsvMulti">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Download CSV
+                </button>
+                <button class="btn btn-secondary" id="btnDownloadMaskMulti">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    Download Masks (.nii.gz)
+                </button>
+                <button class="btn btn-outline btn-back" id="btnNewAnalysisMulti">Start Over</button>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <p>BodySegAI — For research purposes only. Not intended for clinical diagnosis.</p>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
