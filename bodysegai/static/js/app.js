@@ -4,9 +4,9 @@
 
 const TISSUE_LABELS = {
     "1": { name: "Skeletal Muscle", short: "SM", color: "#EF4444" },
-    "2": { name: "IMAT", short: "IMAT", color: "#F59E0B" },
-    "5": { name: "SAT", short: "SAT", color: "#3B82F6" },
-    "7": { name: "VAT", short: "VAT", color: "#10B981" },
+    "2": { name: "IMAT", short: "IMAT", color: "#39FF14" },
+    "5": { name: "VAT", short: "VAT", color: "#FACC15" },
+    "7": { name: "SAT", short: "SAT", color: "#25F5FC" },
 };
 
 let currentMode = null;
@@ -76,12 +76,12 @@ async function handleFiles(fileList) {
 
         // Set patient info
         $id("patientName").value = data.patient_name || "";
-        $id("studyDate").value = formatDate(data.study_date) || "—";
+        $id("studyDate").value = formatDate(data.study_date) || "\u2014";
         $id("sliceThickness").value = data.slice_thickness
             ? data.slice_thickness.toFixed(1) + " mm"
-            : "—";
+            : "\u2014";
         $id("imageMeta").textContent =
-            `${data.filename} — ${data.n_slices} slice(s) — Pixel: ${data.pixel_spacing[0].toFixed(2)}×${data.pixel_spacing[1].toFixed(2)} mm`;
+            `${data.filename} \u2014 ${data.n_slices} slice(s) \u2014 Pixel: ${data.pixel_spacing[0].toFixed(2)}\u00d7${data.pixel_spacing[1].toFixed(2)} mm`;
 
         // Set gender
         const sexSelect = $id("patientSex");
@@ -155,9 +155,9 @@ function renderSingleResults(data) {
     const slice = data.slices[0];
 
     // Patient info line
-    const name = $id("patientName").value || "—";
+    const name = $id("patientName").value || "\u2014";
     const sex = $id("patientSex").value === "M" ? "Male" : $id("patientSex").value === "F" ? "Female" : "";
-    $id("resultsPatientInfo").textContent = `${name}${sex ? " · " + sex : ""}`;
+    $id("resultsPatientInfo").textContent = `${name}${sex ? " \u00b7 " + sex : ""}`;
 
     // Raw + overlay
     $id("resultRaw").src = "data:image/png;base64," + slice.raw_preview;
@@ -178,38 +178,11 @@ function renderSingleResults(data) {
             ${overlayImg ? `<div class="image-frame"><img src="data:image/png;base64,${overlayImg}" alt="${info.name}"></div>` : ""}
             <div class="tissue-card-info">
                 <div class="tissue-card-name" style="color:${info.color}">${info.name}</div>
-                <div class="tissue-card-area">${area.toFixed(2)} <span>cm²</span></div>
-                <div class="tissue-card-hu">Mean HU: ${hu !== null && hu !== undefined ? hu : "—"}</div>
+                <div class="tissue-card-area">${area.toFixed(2)} <span>cm\u00b2</span></div>
+                <div class="tissue-card-hu">Mean HU: ${hu !== null && hu !== undefined ? hu : "\u2014"}</div>
             </div>
         `;
         grid.appendChild(card);
-    }
-
-    // Reference values
-    const refSection = $id("referenceSection");
-    const refContent = $id("referenceContent");
-    if (data.references && Object.keys(data.references).length > 0) {
-        refContent.innerHTML = "";
-        for (const [label, ref] of Object.entries(data.references)) {
-            const div = document.createElement("div");
-            div.className = "ref-item";
-            div.innerHTML = `
-                <div class="ref-status ${ref.status}"></div>
-                <div class="ref-message">${ref.message}</div>
-                <div class="ref-source">${ref.source}</div>
-            `;
-            refContent.appendChild(div);
-
-            if (ref.note) {
-                const note = document.createElement("div");
-                note.className = "ref-item";
-                note.innerHTML = `<div class="ref-status info"></div><div class="ref-message" style="font-size:12px;color:var(--text-muted)">${ref.note}</div>`;
-                refContent.appendChild(note);
-            }
-        }
-        refSection.style.display = "block";
-    } else {
-        refSection.style.display = "none";
     }
 }
 
@@ -231,10 +204,10 @@ function renderMultiResults(data) {
             <td>${(a["2"] || 0).toFixed(2)}</td>
             <td>${(a["5"] || 0).toFixed(2)}</td>
             <td>${(a["7"] || 0).toFixed(2)}</td>
-            <td>${h["1"] != null ? h["1"] : "—"}</td>
-            <td>${h["2"] != null ? h["2"] : "—"}</td>
-            <td>${h["5"] != null ? h["5"] : "—"}</td>
-            <td>${h["7"] != null ? h["7"] : "—"}</td>
+            <td>${h["1"] != null ? h["1"] : "\u2014"}</td>
+            <td>${h["2"] != null ? h["2"] : "\u2014"}</td>
+            <td>${h["5"] != null ? h["5"] : "\u2014"}</td>
+            <td>${h["7"] != null ? h["7"] : "\u2014"}</td>
         `;
         tbody.appendChild(tr);
     }
@@ -245,12 +218,12 @@ $id("btnDownloadPdf").addEventListener("click", () => {
     window.location.href = "/api/download/pdf";
 });
 
-$id("btnDownloadCsv").addEventListener("click", () => {
-    window.location.href = "/api/download/csv";
+$id("btnDownloadExcel").addEventListener("click", () => {
+    window.location.href = "/api/download/excel";
 });
 
-$id("btnDownloadCsvMulti").addEventListener("click", () => {
-    window.location.href = "/api/download/csv";
+$id("btnDownloadExcelMulti").addEventListener("click", () => {
+    window.location.href = "/api/download/excel";
 });
 
 $id("btnDownloadMask").addEventListener("click", () => {
@@ -293,6 +266,17 @@ $id("correctedMaskInput").addEventListener("change", async function () {
     }
 
     this.value = "";
+});
+
+// ---- Shutdown ----
+$id("btnShutdown").addEventListener("click", async () => {
+    if (!confirm("Shut down BodySegAI?")) return;
+    try {
+        await fetch("/api/shutdown");
+    } catch (e) {
+        // Expected — server dies
+    }
+    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#64748B;"><h2>BodySegAI has been shut down. You can close this tab.</h2></div>';
 });
 
 // ---- Start Over ----

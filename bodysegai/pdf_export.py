@@ -12,22 +12,14 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
 from .postprocessing import LABEL_MUSCLE, LABEL_IMAT, LABEL_SAT, LABEL_VAT, TISSUE_NAMES
-from .analysis import REFERENCES
 from .visualization import create_overlay_image, create_single_tissue_overlay, hu_to_display
 
 # Colors matching the web UI
-TISSUE_COLORS_RGB = {
-    LABEL_MUSCLE: (239, 68, 68),
-    LABEL_IMAT: (245, 158, 11),
-    LABEL_SAT: (59, 130, 246),
-    LABEL_VAT: (16, 185, 129),
-}
-
 TISSUE_COLORS_HEX = {
     LABEL_MUSCLE: "#EF4444",
-    LABEL_IMAT: "#F59E0B",
-    LABEL_SAT: "#3B82F6",
-    LABEL_VAT: "#10B981",
+    LABEL_IMAT: "#39FF14",
+    LABEL_VAT: "#FACC15",
+    LABEL_SAT: "#25F5FC",
 }
 
 
@@ -74,20 +66,6 @@ def generate_pdf(
                               fontName="Helvetica-Bold", fontSize=12,
                               textColor=HexColor("#1E293B"),
                               spaceBefore=6*mm, spaceAfter=3*mm))
-    styles.add(ParagraphStyle(name="BodySmall",
-                              fontName="Helvetica", fontSize=9,
-                              textColor=HexColor("#334155"),
-                              spaceAfter=2*mm))
-    styles.add(ParagraphStyle(name="TissueLabel",
-                              fontName="Helvetica-Bold", fontSize=10,
-                              alignment=TA_CENTER, spaceAfter=1*mm))
-    styles.add(ParagraphStyle(name="AreaValue",
-                              fontName="Helvetica", fontSize=9,
-                              alignment=TA_CENTER, spaceAfter=1*mm))
-    styles.add(ParagraphStyle(name="RefNote",
-                              fontName="Helvetica-Oblique", fontSize=7,
-                              textColor=HexColor("#94A3B8"),
-                              alignment=TA_CENTER))
 
     elements = []
 
@@ -130,7 +108,7 @@ def generate_pdf(
     tissue_images = []
     tissue_info = []
 
-    for label in [LABEL_MUSCLE, LABEL_IMAT, LABEL_SAT, LABEL_VAT]:
+    for label in [LABEL_MUSCLE, LABEL_IMAT, LABEL_VAT, LABEL_SAT]:
         overlay = create_single_tissue_overlay(display_hu, mask, label)
         rl_img = _np_to_rl_image(overlay, width_cm=7.5)
 
@@ -169,7 +147,7 @@ def generate_pdf(
     # Summary table
     elements.append(Paragraph("Results Summary", styles["SectionHead"]))
     summary_data = [["Tissue", "Area (cm²)", "Mean HU"]]
-    for label in [LABEL_MUSCLE, LABEL_IMAT, LABEL_SAT, LABEL_VAT]:
+    for label in [LABEL_MUSCLE, LABEL_IMAT, LABEL_VAT, LABEL_SAT]:
         name = TISSUE_NAMES[label]
         area = areas.get(label, 0)
         hu_val = mean_hu.get(label)
@@ -190,39 +168,6 @@ def generate_pdf(
         ("ALIGN", (1, 0), (-1, -1), "CENTER"),
     ]))
     elements.append(sum_table)
-    elements.append(Spacer(1, 4*mm))
-
-    # Reference values
-    if gender_code in REFERENCES:
-        elements.append(Paragraph("Reference Values", styles["SectionHead"]))
-        refs = REFERENCES[gender_code]
-
-        for label, ref in refs.items():
-            area = areas.get(label, 0)
-            color = HexColor("#10B981")  # green
-
-            if "cutoff_area" in ref and area > ref["cutoff_area"]:
-                color = HexColor("#EF4444")  # red
-
-            name = TISSUE_NAMES.get(label, "")
-            msg = ""
-            if "cutoff_area" in ref:
-                cutoff = ref["cutoff_area"]
-                status = "ELEVATED" if area > cutoff else "Normal"
-                msg = f"{name}: {area:.1f} cm² — {status} (cutoff: {cutoff} cm²)"
-            else:
-                msg = f"{name}: {area:.1f} cm²"
-
-            note = ref.get("note", "")
-            source = ref.get("source", "")
-
-            p = Paragraph(f'<font color="{color}">{msg}</font>', styles["BodySmall"])
-            elements.append(p)
-            if note:
-                elements.append(Paragraph(note, styles["RefNote"]))
-            if source:
-                elements.append(Paragraph(f"Ref: {source}", styles["RefNote"]))
-            elements.append(Spacer(1, 2*mm))
 
     # Footer
     elements.append(Spacer(1, 6*mm))

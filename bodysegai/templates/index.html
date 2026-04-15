@@ -19,7 +19,15 @@
             <span class="brand-text">BodySegAI</span>
             <span class="brand-sub">CT Body Composition</span>
         </div>
-        <div class="nav-status" id="navStatus"></div>
+        <div class="nav-right">
+            <div class="nav-status" id="navStatus"></div>
+            <button class="btn btn-shutdown" id="btnShutdown" title="Shut down BodySegAI">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+                    <line x1="12" y1="2" x2="12" y2="12"/>
+                </svg>
+            </button>
+        </div>
     </nav>
 
     <!-- Main Content -->
@@ -158,19 +166,13 @@
             <!-- Legend -->
             <div class="legend-bar">
                 <div class="legend-item"><span class="legend-color" style="background:#EF4444"></span>Skeletal Muscle</div>
-                <div class="legend-item"><span class="legend-color" style="background:#F59E0B"></span>IMAT</div>
-                <div class="legend-item"><span class="legend-color" style="background:#3B82F6"></span>SAT</div>
-                <div class="legend-item"><span class="legend-color" style="background:#10B981"></span>VAT</div>
+                <div class="legend-item"><span class="legend-color" style="background:#39FF14"></span>IMAT</div>
+                <div class="legend-item"><span class="legend-color" style="background:#FACC15"></span>VAT</div>
+                <div class="legend-item"><span class="legend-color" style="background:#25F5FC"></span>SAT</div>
             </div>
 
             <!-- Tissue detail cards -->
             <div class="tissue-grid" id="tissueGrid"></div>
-
-            <!-- Reference values -->
-            <div class="reference-section" id="referenceSection" style="display:none;">
-                <h3>Reference Values</h3>
-                <div id="referenceContent"></div>
-            </div>
 
             <!-- Action buttons -->
             <div class="action-bar">
@@ -183,13 +185,13 @@
                     </svg>
                     Download PDF Report
                 </button>
-                <button class="btn btn-secondary" id="btnDownloadCsv">
+                <button class="btn btn-secondary" id="btnDownloadExcel">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    Download CSV
+                    Download Excel
                 </button>
                 <button class="btn btn-secondary" id="btnDownloadMask">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -227,12 +229,12 @@
                             <th>Slice</th>
                             <th>SM (cm²)</th>
                             <th>IMAT (cm²)</th>
-                            <th>SAT (cm²)</th>
                             <th>VAT (cm²)</th>
+                            <th>SAT (cm²)</th>
                             <th>SM HU</th>
                             <th>IMAT HU</th>
-                            <th>SAT HU</th>
                             <th>VAT HU</th>
+                            <th>SAT HU</th>
                         </tr>
                     </thead>
                     <tbody id="multiResultsBody"></tbody>
@@ -240,13 +242,13 @@
             </div>
 
             <div class="action-bar">
-                <button class="btn btn-primary" id="btnDownloadCsvMulti">
+                <button class="btn btn-primary" id="btnDownloadExcelMulti">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="7 10 12 15 17 10"/>
                         <line x1="12" y1="15" x2="12" y2="3"/>
                     </svg>
-                    Download CSV
+                    Download Excel
                 </button>
                 <button class="btn btn-secondary" id="btnDownloadMaskMulti">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -263,7 +265,14 @@
     </main>
 
     <footer class="footer">
-        <p>BodySegAI — For research purposes only. Not intended for clinical diagnosis.</p>
+        <p>
+            BodySegAI — For research purposes only. Not intended for clinical diagnosis.
+        </p>
+        <p class="footer-links">
+            <a href="https://onlinelibrary.wiley.com/doi/10.1002/crt2.53" target="_blank" rel="noopener">Publication</a>
+            <span class="footer-sep">|</span>
+            <a href="/api/licence" target="_blank">Licence</a>
+        </p>
     </footer>
 
     <script src="/static/js/app.js"></script>

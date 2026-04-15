@@ -8,9 +8,9 @@ from .postprocessing import LABEL_MUSCLE, LABEL_IMAT, LABEL_SAT, LABEL_VAT
 # Tissue colors (RGB)
 TISSUE_COLORS = {
     LABEL_MUSCLE: (239, 68, 68),     # Red
-    LABEL_IMAT: (245, 158, 11),      # Amber
-    LABEL_SAT: (59, 130, 246),       # Blue
-    LABEL_VAT: (16, 185, 129),       # Emerald
+    LABEL_IMAT: (57, 255, 20),       # Neon green
+    LABEL_VAT: (250, 204, 21),       # Yellow
+    LABEL_SAT: (37, 245, 252),       # Light blue
 }
 
 # CT window for body composition display

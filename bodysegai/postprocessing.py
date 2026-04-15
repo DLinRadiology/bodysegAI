@@ -5,22 +5,22 @@ from skimage.transform import resize
 LABEL_BACKGROUND = 0
 LABEL_MUSCLE = 1
 LABEL_IMAT = 2
-LABEL_SAT = 5
-LABEL_VAT = 7
+LABEL_VAT = 5
+LABEL_SAT = 7
 
 TISSUE_NAMES = {
     LABEL_MUSCLE: "Skeletal Muscle",
     LABEL_IMAT: "Intramuscular Adipose Tissue (IMAT)",
-    LABEL_SAT: "Subcutaneous Adipose Tissue (SAT)",
     LABEL_VAT: "Visceral Adipose Tissue (VAT)",
+    LABEL_SAT: "Subcutaneous Adipose Tissue (SAT)",
 }
 
 # HU thresholds per channel
-# Channel 0 = muscle, Channel 1 = SAT, Channel 2 = VAT
+# Channel 0 = muscle, Channel 1 = VAT, Channel 2 = SAT
 CHANNEL_HU_RANGES = {
     0: (-190, 150),   # muscle
-    1: (-150, -50),   # SAT
-    2: (-190, -30),   # VAT
+    1: (-150, -50),   # VAT
+    2: (-190, -30),   # SAT
 }
 
 IMAT_HU_THRESHOLD = -30
@@ -57,7 +57,7 @@ def process_prediction(pred: np.ndarray, orig_hu: np.ndarray) -> np.ndarray:
     mask[pred[:, :, 0] == maximum] = LABEL_MUSCLE
     # IMAT: muscle pixels with low HU
     mask[(mask == LABEL_MUSCLE) & (orig_hu <= IMAT_HU_THRESHOLD)] = LABEL_IMAT
-    mask[pred[:, :, 1] == maximum] = LABEL_SAT
-    mask[pred[:, :, 2] == maximum] = LABEL_VAT
+    mask[pred[:, :, 1] == maximum] = LABEL_VAT
+    mask[pred[:, :, 2] == maximum] = LABEL_SAT
 
     return mask

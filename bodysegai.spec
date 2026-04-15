@@ -18,6 +18,7 @@ a = Analysis(
         (MODEL_PATH, 'xRobotstuffx'),
         (os.path.join(ROOT, 'bodysegai', 'templates'), 'bodysegai/templates'),
         (os.path.join(ROOT, 'bodysegai', 'static'), 'bodysegai/static'),
+        (os.path.join(ROOT, 'licence.pdf'), '.'),
     ],
     hiddenimports=[
         'onnxruntime',

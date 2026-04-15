@@ -7,3 +7,4 @@ Pillow
 flask
 reportlab
 pydicom
+openpyxl
