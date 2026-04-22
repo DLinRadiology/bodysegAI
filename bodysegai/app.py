@@ -19,7 +19,7 @@ from .postprocessing import (
     process_prediction, LABEL_MUSCLE, LABEL_IMAT, LABEL_SAT, LABEL_VAT, TISSUE_NAMES,
 )
 from .io_handlers import (
-    load_nifti, load_single_dicom, load_dicom_series, save_nifti_mask, classify_uploads,
+    load_nifti, load_single_dicom, save_nifti_mask, classify_uploads,
 )
 from .analysis import compute_areas, compute_mean_hu
 from .visualization import hu_to_display, create_overlay_image, np_to_base64_png, create_single_tissue_overlay
@@ -88,16 +88,14 @@ state = {
     "loaded": False,
     "mode": None,
     "image_data": None,
+    "slice_infos": [],       # per-slice: {filename, pixel_spacing, slice_thickness, source, affine}
     "hu_slices_oriented": [],
     "masks": [],
     "masks_original": None,
     "areas": [],
     "mean_hus": [],
-    "patient_name": "",
     "patient_sex": "",
     "study_date": "",
-    "pixel_spacing": (1.0, 1.0),
-    "slice_thickness": None,
     "segmented": False,
 }
 
@@ -105,10 +103,10 @@ state = {
 def _reset_state():
     state.update({
         "loaded": False, "mode": None, "image_data": None,
+        "slice_infos": [],
         "hu_slices_oriented": [], "masks": [], "masks_original": None,
         "areas": [], "mean_hus": [],
-        "patient_name": "", "patient_sex": "", "study_date": "",
-        "pixel_spacing": (1.0, 1.0), "slice_thickness": None,
+        "patient_sex": "", "study_date": "",
         "segmented": False,
     })
 
@@ -137,48 +135,59 @@ def upload():
 
         file_type, paths = classify_uploads(saved_paths)
 
+        # Load each file individually — never stack into a volume
+        loaded = []  # list of img_info dicts (each single-slice)
         if file_type == "nifti":
-            img_info = load_nifti(paths[0])
-        elif file_type == "dicom_single":
-            img_info = load_single_dicom(paths[0])
-        elif file_type == "dicom_series":
-            img_info = load_dicom_series(paths)
+            for p in paths:
+                loaded.append(load_nifti(p))
+        elif file_type in ("dicom_single", "dicom_series"):
+            for p in paths:
+                loaded.append(load_single_dicom(p))
         else:
-            try:
-                if len(paths) == 1:
-                    img_info = load_single_dicom(paths[0])
-                else:
-                    img_info = load_dicom_series(paths)
-            except Exception:
-                return jsonify({"error": "Unsupported file format"}), 400
+            for p in paths:
+                try:
+                    loaded.append(load_single_dicom(p))
+                except Exception:
+                    return jsonify({"error": f"Unsupported file: {os.path.basename(p)}"}), 400
 
-        data = img_info["data"]
-        is_nifti = img_info["source"] == "nifti"
-
-        if img_info["is_2d"] or img_info["n_slices"] == 1:
-            mode = "single"
-        else:
-            mode = "multi"
-
+        # Build per-slice lists
         hu_slices = []
-        if img_info["is_2d"] or len(data.shape) == 2:
-            raw = data if len(data.shape) == 2 else data[:, :, 0]
-            oriented = orient_for_display_nifti(raw) if is_nifti else orient_for_display_dicom(raw)
-            hu_slices.append(oriented)
-        else:
-            for i in range(data.shape[2]):
-                raw = data[:, :, i]
+        slice_infos = []
+
+        for img_info in loaded:
+            data = img_info["data"]
+            is_nifti = img_info["source"] == "nifti"
+            info_base = {
+                "filename": img_info["filename"],
+                "pixel_spacing": img_info["pixel_spacing"],
+                "slice_thickness": img_info["slice_thickness"],
+                "source": img_info["source"],
+                "affine": img_info.get("affine"),
+            }
+
+            if img_info["is_2d"] or len(data.shape) == 2:
+                raw = data if len(data.shape) == 2 else data[:, :, 0]
                 oriented = orient_for_display_nifti(raw) if is_nifti else orient_for_display_dicom(raw)
                 hu_slices.append(oriented)
+                slice_infos.append(info_base)
+            else:
+                # 3D NIfTI — expand into individual slices
+                for i in range(data.shape[2]):
+                    raw = data[:, :, i]
+                    oriented = orient_for_display_nifti(raw) if is_nifti else orient_for_display_dicom(raw)
+                    hu_slices.append(oriented)
+                    slice_infos.append(info_base)
 
+        mode = "single" if len(hu_slices) == 1 else "multi"
+
+        # Use first file's patient info as default
+        first = loaded[0]
         state.update({
-            "loaded": True, "mode": mode, "image_data": img_info,
+            "loaded": True, "mode": mode, "image_data": first,
+            "slice_infos": slice_infos,
             "hu_slices_oriented": hu_slices,
-            "patient_name": img_info["patient_name"],
-            "patient_sex": img_info["patient_sex"],
-            "study_date": img_info["study_date"],
-            "pixel_spacing": img_info["pixel_spacing"],
-            "slice_thickness": img_info["slice_thickness"],
+            "patient_sex": first["patient_sex"],
+            "study_date": first["study_date"],
             "segmented": False, "masks": [], "masks_original": None,
             "areas": [], "mean_hus": [],
         })
@@ -190,12 +199,11 @@ def upload():
         return jsonify({
             "success": True, "mode": mode, "n_slices": len(hu_slices),
             "preview": preview_b64,
-            "patient_name": state["patient_name"],
             "patient_sex": state["patient_sex"],
             "study_date": state["study_date"],
-            "slice_thickness": state["slice_thickness"],
-            "pixel_spacing": list(state["pixel_spacing"]),
-            "filename": img_info["filename"],
+            "slice_thickness": slice_infos[0]["slice_thickness"],
+            "pixel_spacing": list(slice_infos[0]["pixel_spacing"]),
+            "filename": slice_infos[0]["filename"],
         })
 
     except Exception as e:
@@ -211,14 +219,12 @@ def segment():
             return jsonify({"error": "No image loaded"}), 400
 
         body = request.get_json() or {}
-        state["patient_name"] = body.get("patient_name", state["patient_name"])
         state["patient_sex"] = body.get("patient_sex", state["patient_sex"])
 
         load_model()
 
         hu_slices = state["hu_slices_oriented"]
-        img_info = state["image_data"]
-        is_nifti = img_info["source"] == "nifti"
+        slice_infos = state["slice_infos"]
 
         masks = []
         areas_list = []
@@ -231,23 +237,11 @@ def segment():
             pred = predict_slice(resized)
             mask = process_prediction(pred, hu_oriented)
             masks.append(mask)
-            areas_list.append(compute_areas(mask, state["pixel_spacing"]))
+            areas_list.append(compute_areas(mask, slice_infos[i]["pixel_spacing"]))
             mean_hus_list.append(compute_mean_hu(mask, hu_oriented))
 
-        # Build original-space mask for NIfTI saving
-        if is_nifti:
-            orig_data = img_info["data"]
-            if img_info["is_2d"] or len(orig_data.shape) == 2:
-                masks_orig = undo_orientation_nifti(masks[0])
-            else:
-                masks_orig = np.zeros(orig_data.shape, dtype=np.uint8)
-                for i, m in enumerate(masks):
-                    masks_orig[:, :, i] = undo_orientation_nifti(m)
-        else:
-            masks_orig = masks[0] if len(masks) == 1 else np.stack(masks, axis=-1)
-
         state.update({
-            "masks": masks, "masks_original": masks_orig,
+            "masks": masks,
             "areas": areas_list, "mean_hus": mean_hus_list,
             "segmented": True,
         })
@@ -267,6 +261,8 @@ def segment():
                 "areas": {str(k): v for k, v in areas_list[i].items()},
                 "mean_hu": {str(k): v for k, v in mean_hus_list[i].items()},
                 "slice_index": i,
+                "filename": slice_infos[i]["filename"],
+                "slice_thickness": slice_infos[i]["slice_thickness"],
             }
 
             if state["mode"] == "single":
@@ -295,16 +291,17 @@ def download_pdf():
     if state["patient_sex"]:
         gender_code = state["patient_sex"][0].upper()
 
+    si = state["slice_infos"][0]
     pdf_bytes = generate_pdf(
         hu_image=state["hu_slices_oriented"][0],
         mask=state["masks"][0],
         areas=state["areas"][0],
         mean_hu=state["mean_hus"][0],
-        patient_name=state["patient_name"],
+        patient_name=si["filename"],
         patient_sex=state["patient_sex"],
         study_date=state["study_date"],
-        slice_thickness=state["slice_thickness"],
-        pixel_spacing=state["pixel_spacing"],
+        slice_thickness=si["slice_thickness"],
+        pixel_spacing=si["pixel_spacing"],
         gender_code=gender_code,
     )
 
@@ -331,6 +328,7 @@ def download_excel():
         "Slice", "Image Name",
         "SM Area (cm2)", "IMAT Area (cm2)", "VAT Area (cm2)", "SAT Area (cm2)",
         "SM Mean HU", "IMAT Mean HU", "VAT Mean HU", "SAT Mean HU",
+        "Slice Thickness (mm)",
     ]
     ws.append(headers)
 
@@ -339,16 +337,17 @@ def download_excel():
     for cell in ws[1]:
         cell.font = Font(bold=True)
 
-    filename = state["image_data"]["filename"] if state["image_data"] else "unknown"
     for i in range(len(state["areas"])):
+        si = state["slice_infos"][i] if i < len(state["slice_infos"]) else {}
         a = state["areas"][i]
         h = state["mean_hus"][i]
         ws.append([
-            i + 1, filename,
+            i + 1, si.get("filename", "unknown"),
             a.get(LABEL_MUSCLE, 0), a.get(LABEL_IMAT, 0),
             a.get(LABEL_VAT, 0), a.get(LABEL_SAT, 0),
             h.get(LABEL_MUSCLE, ""), h.get(LABEL_IMAT, ""),
             h.get(LABEL_VAT, ""), h.get(LABEL_SAT, ""),
+            si.get("slice_thickness"),
         ])
 
     # Auto-width columns
@@ -370,32 +369,63 @@ def download_excel():
 
 @app.route("/api/download/mask")
 def download_mask():
-    """Download segmentation mask as .nii.gz."""
+    """Download segmentation mask(s) as .nii.gz (single) or .zip (multi)."""
     if not state["segmented"]:
         return jsonify({"error": "No segmentation available"}), 400
 
-    affine = state["image_data"].get("affine") if state["image_data"] else None
-    mask_data = state["masks_original"]
+    import zipfile
 
-    tmp = tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False)
-    tmp.close()
-    save_nifti_mask(mask_data, affine, tmp.name)
+    masks = state["masks"]
+    slice_infos = state["slice_infos"]
 
-    # Build filename: mask_originalname.nii.gz
-    orig_name = state["image_data"]["filename"] if state["image_data"] else "output"
-    # Strip existing extensions
-    base = orig_name
-    for ext in [".nii.gz", ".nii", ".dcm", ".gz"]:
-        if base.lower().endswith(ext):
-            base = base[:-len(ext)]
-            break
+    def _mask_filename(si):
+        base = si.get("filename", "output")
+        for ext in [".nii.gz", ".nii", ".dcm", ".gz"]:
+            if base.lower().endswith(ext):
+                base = base[:-len(ext)]
+                break
+        return base
 
-    return send_file(
-        tmp.name,
-        mimetype="application/gzip",
-        as_attachment=True,
-        download_name=f"mask_{base}.nii.gz",
-    )
+    if len(masks) == 1:
+        # Single mask — save as .nii.gz
+        si = slice_infos[0]
+        is_nifti = si["source"] == "nifti"
+        mask_data = undo_orientation_nifti(masks[0]) if is_nifti else masks[0]
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False)
+        tmp.close()
+        save_nifti_mask(mask_data, si.get("affine"), tmp.name)
+
+        return send_file(
+            tmp.name,
+            mimetype="application/gzip",
+            as_attachment=True,
+            download_name=f"mask_{_mask_filename(si)}.nii.gz",
+        )
+    else:
+        # Multiple masks — zip individual .nii.gz files
+        tmp_zip = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        tmp_zip.close()
+
+        with zipfile.ZipFile(tmp_zip.name, "w", zipfile.ZIP_DEFLATED) as zf:
+            for i, (mask, si) in enumerate(zip(masks, slice_infos)):
+                is_nifti = si["source"] == "nifti"
+                mask_data = undo_orientation_nifti(mask) if is_nifti else mask
+
+                tmp_nii = tempfile.NamedTemporaryFile(suffix=".nii.gz", delete=False)
+                tmp_nii.close()
+                save_nifti_mask(mask_data, si.get("affine"), tmp_nii.name)
+
+                arcname = f"mask_{_mask_filename(si)}.nii.gz"
+                zf.write(tmp_nii.name, arcname)
+                os.remove(tmp_nii.name)
+
+        return send_file(
+            tmp_zip.name,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=f"bodysegai_masks_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+        )
 
 
 @app.route("/api/upload_mask", methods=["POST"])
@@ -439,12 +469,14 @@ def upload_corrected_mask():
 
         areas_list = []
         mean_hus_list = []
+        slice_infos = state["slice_infos"]
         for i in range(len(masks)):
-            areas_list.append(compute_areas(masks[i], state["pixel_spacing"]))
+            ps = slice_infos[i]["pixel_spacing"] if i < len(slice_infos) else (1.0, 1.0)
+            areas_list.append(compute_areas(masks[i], ps))
             mean_hus_list.append(compute_mean_hu(masks[i], hu_slices[i]))
 
         state.update({
-            "masks": masks, "masks_original": mask_data,
+            "masks": masks,
             "areas": areas_list, "mean_hus": mean_hus_list,
             "segmented": True,
         })
@@ -458,12 +490,15 @@ def upload_corrected_mask():
             display_hu = hu_to_display(hu_slices[i])
             overlay = create_overlay_image(display_hu, masks[i])
 
+            si = slice_infos[i] if i < len(slice_infos) else {}
             slice_data = {
                 "raw_preview": np_to_base64_png(display_hu),
                 "overlay_preview": np_to_base64_png(overlay),
                 "areas": {str(k): v for k, v in areas_list[i].items()},
                 "mean_hu": {str(k): v for k, v in mean_hus_list[i].items()},
                 "slice_index": i,
+                "filename": si.get("filename", ""),
+                "slice_thickness": si.get("slice_thickness"),
             }
 
             if state["mode"] == "single":

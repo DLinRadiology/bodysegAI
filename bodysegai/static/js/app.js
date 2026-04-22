@@ -4,9 +4,9 @@
 
 const TISSUE_LABELS = {
     "1": { name: "Skeletal Muscle", short: "SM", color: "#EF4444" },
-    "2": { name: "IMAT", short: "IMAT", color: "#39FF14" },
-    "5": { name: "VAT", short: "VAT", color: "#FACC15" },
-    "7": { name: "SAT", short: "SAT", color: "#25F5FC" },
+    "2": { name: "Inter- & Intramuscular Adipose Tissue", short: "IMAT", color: "#39FF14" },
+    "5": { name: "Visceral Adipose Tissue", short: "VAT", color: "#FACC15" },
+    "7": { name: "Subcutaneous Adipose Tissue", short: "SAT", color: "#25F5FC" },
 };
 
 let currentMode = null;
@@ -75,7 +75,7 @@ async function handleFiles(fileList) {
         $id("previewImage").src = "data:image/png;base64," + data.preview;
 
         // Set patient info
-        $id("patientName").value = data.patient_name || "";
+        $id("fileName").value = data.filename || "";
         $id("studyDate").value = formatDate(data.study_date) || "\u2014";
         $id("sliceThickness").value = data.slice_thickness
             ? data.slice_thickness.toFixed(1) + " mm"
@@ -117,7 +117,6 @@ async function runSegmentation() {
     showLoading("Running segmentation...");
 
     const body = {
-        patient_name: $id("patientName").value,
         patient_sex: $id("patientSex").value,
     };
 
@@ -155,9 +154,9 @@ function renderSingleResults(data) {
     const slice = data.slices[0];
 
     // Patient info line
-    const name = $id("patientName").value || "\u2014";
+    const fname = $id("fileName").value || "\u2014";
     const sex = $id("patientSex").value === "M" ? "Male" : $id("patientSex").value === "F" ? "Female" : "";
-    $id("resultsPatientInfo").textContent = `${name}${sex ? " \u00b7 " + sex : ""}`;
+    $id("resultsPatientInfo").textContent = `${fname}${sex ? " \u00b7 " + sex : ""}`;
 
     // Raw + overlay
     $id("resultRaw").src = "data:image/png;base64," + slice.raw_preview;
@@ -198,8 +197,9 @@ function renderMultiResults(data) {
         const tr = document.createElement("tr");
         const a = slice.areas;
         const h = slice.mean_hu;
+        const st = slice.slice_thickness != null ? slice.slice_thickness.toFixed(1) : "\u2014";
         tr.innerHTML = `
-            <td>${slice.slice_index + 1}</td>
+            <td>${slice.filename || slice.slice_index + 1}</td>
             <td>${(a["1"] || 0).toFixed(2)}</td>
             <td>${(a["2"] || 0).toFixed(2)}</td>
             <td>${(a["5"] || 0).toFixed(2)}</td>
@@ -208,6 +208,7 @@ function renderMultiResults(data) {
             <td>${h["2"] != null ? h["2"] : "\u2014"}</td>
             <td>${h["5"] != null ? h["5"] : "\u2014"}</td>
             <td>${h["7"] != null ? h["7"] : "\u2014"}</td>
+            <td>${st}</td>
         `;
         tbody.appendChild(tr);
     }
@@ -312,6 +313,35 @@ setInterval(async () => {
         document.body.innerHTML = SHUTDOWN_MSG;
     }
 }, 30000);
+
+// ---- Image zoom modal ----
+const imageModal = $id("imageModal");
+const imageModalImg = $id("imageModalImg");
+
+function openModal(src) {
+    imageModalImg.src = src;
+    imageModal.classList.add("visible");
+}
+
+function closeModal() {
+    imageModal.classList.remove("visible");
+    imageModalImg.src = "";
+}
+
+$id("imageModalClose").addEventListener("click", closeModal);
+imageModal.addEventListener("click", closeModal);
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+});
+
+document.addEventListener("click", (e) => {
+    const img = e.target.closest(".image-frame img, .comparison-view img");
+    if (img) {
+        e.preventDefault();
+        openModal(img.src);
+    }
+});
 
 // ---- Start Over ----
 [$id("btnBack"), $id("btnBackMulti"), $id("btnNewAnalysis"), $id("btnNewAnalysisMulti")].forEach(

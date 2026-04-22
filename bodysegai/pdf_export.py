@@ -7,7 +7,7 @@ from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm, cm
 from reportlab.lib.colors import HexColor, black, white, Color
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 
@@ -83,7 +83,7 @@ def generate_pdf(
     thickness_display = f"{slice_thickness:.1f} mm" if slice_thickness else "—"
 
     info_data = [
-        ["Patient Name", patient_name or "—", "Exam Date", study_date_display],
+        ["File Name", patient_name or "—", "Exam Date", study_date_display],
         ["Gender", sex_display, "Segmentation Date", seg_date],
         ["Slice Thickness", thickness_display, "Pixel Spacing", f"{pixel_spacing[0]:.2f} x {pixel_spacing[1]:.2f} mm"],
     ]
@@ -142,9 +142,9 @@ def generate_pdf(
         ("BOTTOMPADDING", (0, 0), (-1, -1), 1*mm),
     ]))
     elements.append(img_table)
-    elements.append(Spacer(1, 4*mm))
 
-    # Summary table
+    # Summary table — new page
+    elements.append(PageBreak())
     elements.append(Paragraph("Results Summary", styles["SectionHead"]))
     summary_data = [["Tissue", "Area (cm²)", "Mean HU"]]
     for label in [LABEL_MUSCLE, LABEL_IMAT, LABEL_VAT, LABEL_SAT]:
