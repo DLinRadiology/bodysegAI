@@ -1,5 +1,7 @@
 import os
 import io
+import glob
+import time
 import tempfile
 import traceback
 import threading
@@ -34,6 +36,52 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500MB
 
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# Idle timeout (seconds) — server auto-shuts down after this much inactivity
+IDLE_TIMEOUT = 1800  # 30 minutes
+
+_last_activity = time.time()
+_watchdog_started = False
+_watchdog_lock = threading.Lock()
+
+
+def _cleanup_temp_files():
+    """Remove uploaded files and leftover temp NIfTI files."""
+    for f in os.listdir(UPLOAD_DIR):
+        try:
+            os.remove(os.path.join(UPLOAD_DIR, f))
+        except OSError:
+            pass
+    for f in glob.glob(os.path.join(tempfile.gettempdir(), "tmp*.nii.gz")):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+
+
+def _idle_watchdog():
+    """Background thread that exits the process after IDLE_TIMEOUT of inactivity."""
+    while True:
+        time.sleep(30)
+        if time.time() - _last_activity > IDLE_TIMEOUT:
+            print(f"BodySegAI: idle for {IDLE_TIMEOUT}s — shutting down.")
+            _cleanup_temp_files()
+            os._exit(0)
+
+
+@app.before_request
+def _track_activity():
+    global _last_activity, _watchdog_started
+    # Don't count idle-status polls as activity
+    if request.path == "/api/idle-status":
+        return
+    _last_activity = time.time()
+    with _watchdog_lock:
+        if not _watchdog_started:
+            _watchdog_started = True
+            t = threading.Thread(target=_idle_watchdog, daemon=True)
+            t.start()
+
 
 # Session state (single-user desktop app)
 state = {
@@ -443,12 +491,31 @@ def serve_licence():
     return jsonify({"error": "Licence file not found"}), 404
 
 
+@app.route("/api/keepalive")
+def keepalive():
+    """Reset the idle timer (called by frontend 'Stay alive' button)."""
+    global _last_activity
+    _last_activity = time.time()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/idle-status")
+def idle_status():
+    """Return how long the server has been idle and when it will shut down."""
+    idle = time.time() - _last_activity
+    return jsonify({
+        "idle_seconds": round(idle),
+        "timeout_seconds": IDLE_TIMEOUT,
+        "remaining_seconds": max(0, round(IDLE_TIMEOUT - idle)),
+    })
+
+
 @app.route("/api/shutdown")
 def shutdown():
     """Shut down the application."""
     def _shutdown():
-        import time
         time.sleep(0.5)
+        _cleanup_temp_files()
         os._exit(0)
     threading.Thread(target=_shutdown, daemon=True).start()
     return jsonify({"message": "Shutting down..."})

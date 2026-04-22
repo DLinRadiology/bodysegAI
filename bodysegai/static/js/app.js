@@ -269,6 +269,8 @@ $id("correctedMaskInput").addEventListener("change", async function () {
 });
 
 // ---- Shutdown ----
+const SHUTDOWN_MSG = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#64748B;"><h2>BodySegAI has been shut down. You can close this tab.</h2></div>';
+
 $id("btnShutdown").addEventListener("click", async () => {
     if (!confirm("Shut down BodySegAI?")) return;
     try {
@@ -276,8 +278,40 @@ $id("btnShutdown").addEventListener("click", async () => {
     } catch (e) {
         // Expected — server dies
     }
-    document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;color:#64748B;"><h2>BodySegAI has been shut down. You can close this tab.</h2></div>';
+    document.body.innerHTML = SHUTDOWN_MSG;
 });
+
+// ---- Idle timeout warning ----
+const idleToast = $id("idleToast");
+const idleMsg = $id("idleMsg");
+const btnStayAlive = $id("btnStayAlive");
+
+btnStayAlive.addEventListener("click", async () => {
+    try { await fetch("/api/keepalive"); } catch (e) { /* ignore */ }
+    idleToast.classList.remove("visible");
+});
+
+setInterval(async () => {
+    try {
+        const resp = await fetch("/api/idle-status");
+        const data = await resp.json();
+        const remaining = data.remaining_seconds;
+        if (remaining <= 0) {
+            document.body.innerHTML = SHUTDOWN_MSG;
+            return;
+        }
+        if (remaining <= 300) {
+            const mins = Math.ceil(remaining / 60);
+            idleMsg.textContent = `Server will shut down in ${mins} min due to inactivity.`;
+            idleToast.classList.add("visible");
+        } else {
+            idleToast.classList.remove("visible");
+        }
+    } catch (e) {
+        // Server already gone
+        document.body.innerHTML = SHUTDOWN_MSG;
+    }
+}, 30000);
 
 // ---- Start Over ----
 [$id("btnBack"), $id("btnBackMulti"), $id("btnNewAnalysis"), $id("btnNewAnalysisMulti")].forEach(
