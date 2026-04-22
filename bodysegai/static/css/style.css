@@ -661,11 +661,14 @@ body {
     display: flex;
 }
 .image-modal img {
+    width: 90vh;
+    height: 90vh;
     max-width: 90vw;
     max-height: 90vh;
     object-fit: contain;
     border-radius: var(--radius-sm);
     cursor: pointer;
+    image-rendering: pixelated;
 }
 .image-modal-close {
     position: absolute;

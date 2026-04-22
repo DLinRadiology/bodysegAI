@@ -15,7 +15,6 @@ let currentMode = null;
 const $id = (id) => document.getElementById(id);
 const dropZone = $id("dropZone");
 const fileInput = $id("fileInput");
-const folderInput = $id("folderInput");
 const loadingOverlay = $id("loadingOverlay");
 const loadingText = $id("loadingText");
 
@@ -45,10 +44,6 @@ dropZone.addEventListener("drop", (e) => {
 
 fileInput.addEventListener("change", () => {
     if (fileInput.files.length) handleFiles(fileInput.files);
-});
-
-folderInput.addEventListener("change", () => {
-    if (folderInput.files.length) handleFiles(folderInput.files);
 });
 
 async function handleFiles(fileList) {
@@ -350,7 +345,6 @@ document.addEventListener("click", (e) => {
             btn.addEventListener("click", () => {
                 currentMode = null;
                 fileInput.value = "";
-                folderInput.value = "";
                 showStep("stepUpload");
             });
     }

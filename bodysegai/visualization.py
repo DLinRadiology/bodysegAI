@@ -32,7 +32,7 @@ def grayscale_to_rgb(gray):
     return np.stack([gray, gray, gray], axis=-1)
 
 
-def create_overlay_image(display_gray, mask, alpha=0.45):
+def create_overlay_image(display_gray, mask, alpha=1.0):
     """Create RGB image with all tissue classes overlaid on grayscale CT."""
     rgb = grayscale_to_rgb(display_gray).astype(np.float64)
 
@@ -47,7 +47,7 @@ def create_overlay_image(display_gray, mask, alpha=0.45):
     return np.clip(rgb, 0, 255).astype(np.uint8)
 
 
-def create_single_tissue_overlay(display_gray, mask, label, alpha=0.5):
+def create_single_tissue_overlay(display_gray, mask, label, alpha=1.0):
     """Create RGB image with just one tissue class highlighted."""
     rgb = grayscale_to_rgb(display_gray).astype(np.float64)
     color = TISSUE_COLORS.get(label, (255, 255, 255))
